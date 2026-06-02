@@ -135,19 +135,61 @@ public class ABB<K, V> implements IMapeamento<K, V>{
      * @return o tamanho atualizado da árvore após a execução da operação de inserção.
      */
     public int inserir(K chave, V item) {
-    	// TODO
+    	raiz = inserir(raiz, chave, item);
     	return tamanho;
     }
 
-    @Override 
+    /**
+     * Insere recursivamente um item na (sub-)árvore, mantendo a propriedade de ordenação da ABB.
+     * @param raizArvore raiz da (sub-)árvore onde o item será inserido.
+     * @param chave a chave associada ao item.
+     * @param item o item que será inserido.
+     * @return a raiz da (sub-)árvore após a inserção.
+     */
+    private No<K, V> inserir(No<K, V> raizArvore, K chave, V item) {
+
+    	if (raizArvore == null) {
+    		raizArvore = new No<>(chave, item);
+    		tamanho++;
+    	} else {
+    		int comparacao = comparador.compare(chave, raizArvore.getChave());
+
+    		if (comparacao < 0)
+    			raizArvore.setEsquerda(inserir(raizArvore.getEsquerda(), chave, item));
+    		else if (comparacao > 0)
+    			raizArvore.setDireita(inserir(raizArvore.getDireita(), chave, item));
+    		else
+    			throw new RuntimeException("A chave já existe na árvore!");
+    	}
+
+    	return raizArvore;
+    }
+
+    @Override
     public String toString(){
     	return percorrer();
     }
 
     @Override
     public String percorrer() {
-    	// TODO
-    	return null;
+    	StringBuilder percurso = new StringBuilder();
+    	percorrer(raiz, percurso);
+    	return percurso.toString();
+    }
+
+    /**
+     * Percorre recursivamente a árvore em ordem (esquerda, raiz, direita), acumulando
+     * os itens visitados em ordem crescente de chave.
+     * @param raizArvore raiz da (sub-)árvore visitada.
+     * @param percurso acumulador da representação textual dos itens.
+     */
+    private void percorrer(No<K, V> raizArvore, StringBuilder percurso) {
+
+    	if (raizArvore != null) {
+    		percorrer(raizArvore.getEsquerda(), percurso);
+    		percurso.append(raizArvore.getItem() + "\n");
+    		percorrer(raizArvore.getDireita(), percurso);
+    	}
     }
 
     @Override
@@ -157,15 +199,102 @@ public class ABB<K, V> implements IMapeamento<K, V>{
      * @return o valor associado ao item removido.
      */
     public V remover(K chave) {
-    	// TODO
-    	return null;
+    	V removido = pesquisar(chave);
+    	raiz = remover(raiz, chave);
+    	return removido;
+    }
+
+    /**
+     * Remove recursivamente o item de chave indicada da (sub-)árvore, preservando a
+     * propriedade de ordenação da ABB.
+     *
+     * Em nós com dois filhos, a chave/item a remover é substituída pelo seu antecessor
+     * (maior chave da sub-árvore esquerda), que em seguida é removido dessa sub-árvore.
+     * @param raizArvore raiz da (sub-)árvore de onde o item será removido.
+     * @param chave a chave do item a remover.
+     * @return a raiz da (sub-)árvore após a remoção.
+     */
+    private No<K, V> remover(No<K, V> raizArvore, K chave) {
+
+    	if (raizArvore == null)
+    		throw new NoSuchElementException("O item não foi localizado na árvore!");
+
+    	int comparacao = comparador.compare(chave, raizArvore.getChave());
+
+    	if (comparacao < 0)
+    		raizArvore.setEsquerda(remover(raizArvore.getEsquerda(), chave));
+    	else if (comparacao > 0)
+    		raizArvore.setDireita(remover(raizArvore.getDireita(), chave));
+    	else if (raizArvore.getEsquerda() == null) {
+    		raizArvore = raizArvore.getDireita();
+    		tamanho--;
+    	} else if (raizArvore.getDireita() == null) {
+    		raizArvore = raizArvore.getEsquerda();
+    		tamanho--;
+    	} else
+    		raizArvore = substituir(raizArvore, raizArvore.getEsquerda());
+
+    	return raizArvore;
+    }
+
+    /**
+     * Localiza o antecessor (nó de maior chave) da sub-árvore esquerda, copia sua chave e
+     * item para o nó que está sendo removido e elimina o antecessor de sua posição original.
+     * @param itemRemovido nó cujo conteúdo será substituído pelo do antecessor.
+     * @param raizArvore raiz da sub-árvore onde se procura o antecessor.
+     * @return a raiz da sub-árvore esquerda após a remoção do antecessor.
+     */
+    private No<K, V> substituir(No<K, V> itemRemovido, No<K, V> raizArvore) {
+
+    	if (raizArvore.getDireita() != null) {
+    		raizArvore.setDireita(substituir(itemRemovido, raizArvore.getDireita()));
+    	} else {
+    		itemRemovido.setChave(raizArvore.getChave());
+    		itemRemovido.setItem(raizArvore.getItem());
+    		raizArvore = raizArvore.getEsquerda();
+    		tamanho--;
+    	}
+
+    	return raizArvore;
     }
 
     
     public Lista<V> recortar(K chaveDeOnde, K chaveAteOnde) {
-		
-    	// TODO
-		return null;
+		Lista<V> recorte = new Lista<>();
+		recortar(raiz, chaveDeOnde, chaveAteOnde, recorte);
+		return recorte;
+	}
+
+	/**
+	 * Percorre recursivamente a árvore, em ordem crescente de chave, coletando na lista
+	 * todos os itens cujas chaves pertençam ao intervalo [chaveDeOnde, chaveAteOnde].
+	 *
+	 * Explora a propriedade de ordenação da ABB para podar sub-árvores que certamente
+	 * estão fora do intervalo: se a chave da raiz é menor do que o limite inferior, toda
+	 * a sub-árvore esquerda é descartada; se é maior do que o limite superior, toda a
+	 * sub-árvore direita é descartada.
+	 *
+	 * @param raizArvore raiz da (sub-)árvore visitada.
+	 * @param chaveDeOnde limite inferior do intervalo (inclusivo).
+	 * @param chaveAteOnde limite superior do intervalo (inclusivo).
+	 * @param recorte lista que acumula os itens encontrados, em ordem crescente de chave.
+	 */
+	private void recortar(No<K, V> raizArvore, K chaveDeOnde, K chaveAteOnde, Lista<V> recorte) {
+
+		if (raizArvore == null)
+			return;
+
+		int comparacaoInferior = comparador.compare(raizArvore.getChave(), chaveDeOnde);
+		int comparacaoSuperior = comparador.compare(raizArvore.getChave(), chaveAteOnde);
+
+		if (comparacaoInferior > 0)
+			recortar(raizArvore.getEsquerda(), chaveDeOnde, chaveAteOnde, recorte);
+
+		if (comparacaoInferior >= 0 && comparacaoSuperior <= 0)
+			recorte.inserir(raizArvore.getItem());
+
+		if (comparacaoSuperior < 0)
+			recortar(raizArvore.getDireita(), chaveDeOnde, chaveAteOnde, recorte);
 	}
 
 	@Override
